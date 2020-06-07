@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">bleTamk</string>
+    <string name="ble_not_supported">BLE not supported</string>
+    <string name="connect_button">Connect</string>
+    <string name="engine_on">Engine ON</string>
+    <string name="braking">Brake</string>
+    <string name="forward">↑</string>
+    <string name="backward">↓</string>
+    <string name="turn_left">←</string>
+    <string name="turn_right">→</string>
+    <string name="scan_button">Scan</string>
+</resources>
