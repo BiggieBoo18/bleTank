@@ -3,18 +3,22 @@ package com.bletank.bletank
 import android.app.ListActivity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 
 private const val SCAN_PERIOD: Long = 10000
 
 class ScanActivity : AppCompatActivity() {
+    private val TAG = "ScanActivity"
     private var mScanning: Boolean = false
     private lateinit var handler: Handler
     private val REQUEST_ENABLE_BT = 1
@@ -26,6 +30,9 @@ class ScanActivity : AppCompatActivity() {
     }
     private val BluetoothAdapter.isDisabled: Boolean
         get() = !isEnabled
+    private val bluetoothLeScanner by lazy(LazyThreadSafetyMode.NONE) {
+        bluetoothAdapter?.bluetoothLeScanner
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,26 +43,43 @@ class ScanActivity : AppCompatActivity() {
             systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
 
+        handler = Handler()
+
         bleInit()
+        scanLeDevice(true);
     }
 
-//    private fun scanLeDevice(enable: Boolean) {
-//        when (enable) {
-//            true -> {
-//                // Stops scanning after a pre-defined scan period.
-//                handler.postDelayed({
-//                    mScanning = false
-//                    bluetoothAdapter.stopLeScan(leScanCallback)
-//                }, SCAN_PERIOD)
-//                mScanning = true
-//                bluetoothAdapter.startLeScan(leScanCallback)
-//            }
-//            else -> {
-//                mScanning = false
-//                bluetoothAdapter.stopLeScan(leScanCallback)
-//            }
-//        }
-//    }
+    private val leScanCallback = object : ScanCallback() {
+        override fun onBatchScanResults(results: MutableList<ScanResult>) {
+            Log.d(TAG, "LE batch scan result $results")
+        }
+
+        override fun onScanResult(callbackType: Int, result: ScanResult) {
+            Log.d(TAG, "LE scan result $callbackType $result")
+        }
+
+        override fun onScanFailed(errorCode: Int) {
+            Log.w(TAG, "LE scan failed $errorCode")
+        }
+    }
+
+    private fun scanLeDevice(enable: Boolean) {
+        when (enable) {
+            true -> {
+                // Stops scanning after a pre-defined scan period.
+                handler.postDelayed({
+                    mScanning = false
+                    bluetoothLeScanner?.stopScan(leScanCallback)
+                }, SCAN_PERIOD)
+                mScanning = true
+                bluetoothLeScanner?.startScan(leScanCallback)
+            }
+            else -> {
+                mScanning = false
+                bluetoothLeScanner?.stopScan(leScanCallback)
+            }
+        }
+    }
 
     private fun bleInit() {
         // Check for BLE availability
