@@ -3,6 +3,7 @@ package com.bletank.bletank
 import android.Manifest
 import android.app.ListActivity
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
@@ -17,6 +18,9 @@ import android.view.View
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 private const val SCAN_PERIOD: Long = 10000
 
@@ -26,6 +30,8 @@ class ScanActivity : AppCompatActivity() {
     private val REQUEST_ENABLE_FINE_LOCATION = 2
     private var mScanning: Boolean = false
     private lateinit var handler: Handler
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var bondedDeviceList: ArrayList<BluetoothDevice>
     private fun PackageManager.missingSystemFeature(name: String): Boolean = !hasSystemFeature(name)
     // Get BluetoothAdapter
     private val bluetoothAdapter: BluetoothAdapter? by lazy(LazyThreadSafetyMode.NONE) {
@@ -49,8 +55,9 @@ class ScanActivity : AppCompatActivity() {
 
         handler = Handler()
 
+        recyclerViewInit()
         bleInit()
-        scanLeDevice(true);
+        scanLeDevice(true)
     }
 
     private val leScanCallback = object : ScanCallback() {
@@ -83,6 +90,23 @@ class ScanActivity : AppCompatActivity() {
                 bluetoothLeScanner?.stopScan(leScanCallback)
             }
         }
+    }
+
+    private fun recyclerViewInit() {
+        // get recyclerView for device list
+        recyclerView = findViewById(R.id.deviceList)
+        recyclerView.setHasFixedSize(true)
+        // set layout manager
+        val layoutManager = LinearLayoutManager(this)
+        recyclerView.layoutManager = layoutManager
+        // divider
+        recyclerView.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
+        // bonded device list
+        bondedDeviceList = arrayListOf()
+        for (device in bluetoothAdapter?.bondedDevices!!) {
+            bondedDeviceList.add(device)
+        }
+        println(bondedDeviceList)
     }
 
     private fun bleInit() {
