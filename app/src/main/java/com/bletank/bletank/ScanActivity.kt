@@ -27,12 +27,14 @@ private const val SCAN_PERIOD: Long = 10000
 class ScanActivity : AppCompatActivity() {
     private val TAG = "ScanActivity"
     private val REQUEST_ENABLE_BT = 1
-    private val REQUEST_ENABLE_FINE_LOCATION = 2
     private var mScanning: Boolean = false
     private lateinit var handler: Handler
     private lateinit var recyclerView: RecyclerView
     private lateinit var bondedDeviceList: ArrayList<BluetoothDevice>
+    private lateinit var scanDeviceList: ArrayList<BluetoothDevice>
+    private lateinit var scanDeviceListAdapter: DeviceListAdapter
     private fun PackageManager.missingSystemFeature(name: String): Boolean = !hasSystemFeature(name)
+
     // Get BluetoothAdapter
     private val bluetoothAdapter: BluetoothAdapter? by lazy(LazyThreadSafetyMode.NONE) {
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -50,7 +52,8 @@ class ScanActivity : AppCompatActivity() {
 
         // Hide both the navigation bar and the status bar.
         window.decorView.apply {
-            systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            systemUiVisibility =
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
 
         handler = Handler()
@@ -67,6 +70,8 @@ class ScanActivity : AppCompatActivity() {
 
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             Log.d(TAG, "LE scan result $callbackType $result")
+            scanDeviceList.add(result.device)
+            scanDeviceListAdapter.notifyItemInserted(scanDeviceList.size-1);
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -75,38 +80,52 @@ class ScanActivity : AppCompatActivity() {
     }
 
     private fun scanLeDevice(enable: Boolean) {
-        when (enable) {
-            true -> {
-                // Stops scanning after a pre-defined scan period.
-                handler.postDelayed({
+        if (bluetoothAdapter?.isEnabled!!) {
+            when (enable) {
+                true -> {
+                    // Stops scanning after a pre-defined scan period.
+                    handler.postDelayed({
+                        mScanning = false
+                        bluetoothLeScanner?.stopScan(leScanCallback)
+                    }, SCAN_PERIOD)
+                    mScanning = true
+                    bluetoothLeScanner?.startScan(leScanCallback)
+                }
+                else -> {
                     mScanning = false
                     bluetoothLeScanner?.stopScan(leScanCallback)
-                }, SCAN_PERIOD)
-                mScanning = true
-                bluetoothLeScanner?.startScan(leScanCallback)
+                }
             }
-            else -> {
-                mScanning = false
-                bluetoothLeScanner?.stopScan(leScanCallback)
-            }
+        } else {
+            checkPermission()
         }
     }
 
     private fun recyclerViewInit() {
+//        // bonded device list
+//        bondedDeviceList = arrayListOf()
+//        bondedDeviceList.addAll(bluetoothAdapter?.bondedDevices!!)
+        // scan device list
+        scanDeviceList = arrayListOf()
+        scanDeviceListAdapter = DeviceListAdapter(scanDeviceList)
         // get recyclerView for device list
-        recyclerView = findViewById(R.id.deviceList)
-        recyclerView.setHasFixedSize(true)
-        // set layout manager
-        val layoutManager = LinearLayoutManager(this)
-        recyclerView.layoutManager = layoutManager
-        // divider
-        recyclerView.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
-        // bonded device list
-        bondedDeviceList = arrayListOf()
-        for (device in bluetoothAdapter?.bondedDevices!!) {
-            bondedDeviceList.add(device)
+        val viewManager = LinearLayoutManager(this)
+        val divider = DividerItemDecoration(this, DividerItemDecoration.VERTICAL)
+        recyclerView = findViewById<RecyclerView>(R.id.deviceList).apply {
+            setHasFixedSize(true)
+            // set layout manager
+            layoutManager = viewManager
+            // divider
+            addItemDecoration(divider)
+            // set click listener
+            scanDeviceListAdapter.setOnItemClickListener(object:DeviceListAdapter.OnItemClickListener{
+                override fun onItemClickListener(view: View, position: Int, device: BluetoothDevice) {
+                    Log.d(TAG, "Clicked device: ${device.name}")
+                }
+            })
+            // set adapter
+            adapter = scanDeviceListAdapter
         }
-        println(bondedDeviceList)
     }
 
     private fun bleInit() {
@@ -115,49 +134,17 @@ class ScanActivity : AppCompatActivity() {
 
     private fun checkPermission() {
         // Check for BLE availability
-        packageManager.takeIf { it.missingSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) }?.also {
-            Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show()
-            finish()
-        }
+        packageManager.takeIf { it.missingSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) }
+            ?.also {
+                Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show()
+                finish()
+            }
 
         // Ensures Bluetooth is available on the device and it is enabled. If not,
         // displays a dialog requesting user permission to enable Bluetooth.
         bluetoothAdapter?.takeIf { it.isDisabled }?.apply {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
-        }
-
-        // Check for FINE LOCATION
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
-
-            } else {
-                ActivityCompat.requestPermissions(this,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                    REQUEST_ENABLE_FINE_LOCATION)
-            }
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        when(requestCode) {
-            REQUEST_ENABLE_FINE_LOCATION -> {
-                // If request is cancelled, the result arrays are empty.
-                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    // permission was granted, yay! Do the
-                    // contacts-related task you need to do.
-                } else {
-                    // permission denied, boo! Disable the
-                    // functionality that depends on this permission.
-                    finish()
-                }
-                return
-            }
         }
     }
 }
