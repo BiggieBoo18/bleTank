@@ -1,22 +1,27 @@
 package com.bletank.bletank
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
-import android.content.Context
+import android.app.Activity
+import android.bluetooth.BluetoothDevice
+import android.content.ComponentName
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.IBinder
+import android.util.Log
 import android.view.View
 import android.widget.Button
-import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+
 
 class MainActivity : AppCompatActivity() {
-    private val REQUEST_ENABLE_BLUETOOTH = 1
-    private val REQUEST_ENABLE_FINE_LOCATION = 2
+    private val TAG = this::class.java.simpleName
+    private val REQUEST_DEVICE = 1
+    private val REQUEST_ENABLE_FINE_LOCATION = 1
 
     private lateinit var btnConnect:  Button
     private lateinit var btnEngine:   Button
@@ -25,6 +30,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnLeft:     Button
     private lateinit var btnRight:    Button
     private lateinit var btnBrake:    Button
+
+    private var isConnected = false
+    private var bluetoothService: BluetoothService? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,12 +68,22 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when(requestCode) {
             REQUEST_ENABLE_FINE_LOCATION -> {
-                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                } else {
+                if (!(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                     finish()
                 }
                 return
             }
+        }
+    }
+
+    private val serviceConnection: ServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, rawBinder: IBinder) {
+            bluetoothService = (rawBinder as BluetoothService.LocalBinder).getService()
+            Log.d(TAG, "onServiceConnected service= ${bluetoothService}")
+        }
+
+        override fun onServiceDisconnected(classname: ComponentName) {
+            bluetoothService = null
         }
     }
 
@@ -80,8 +98,33 @@ class MainActivity : AppCompatActivity() {
         btnBrake     = findViewById<Button>(R.id.buttonBrake)  // button brake
         // set listeners
         btnConnect.setOnClickListener {
-            val intent = Intent(this, ScanActivity::class.java)
-            startActivity(intent)
+            if (!isConnected) {
+                val intent = Intent(this, ScanActivity::class.java)
+                startActivityForResult(intent, REQUEST_DEVICE)
+            } else {
+                btnConnect.text = getString(R.string.connect_button)
+                isConnected = false
+            }
         }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when(requestCode) {
+            REQUEST_DEVICE -> {
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    val address = data.getStringExtra(BluetoothDevice.EXTRA_DEVICE)
+                    bluetoothService?.connect(address)
+                    Log.d(TAG, address)
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        bluetoothService?.unbindService(serviceConnection)
+        bluetoothService?.stopSelf()
+        bluetoothService = null
     }
 }

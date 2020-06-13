@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.util.Log
 import android.view.View
+import android.widget.Button
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -25,7 +26,7 @@ import androidx.recyclerview.widget.RecyclerView
 private const val SCAN_PERIOD: Long = 10000
 
 class ScanActivity : AppCompatActivity() {
-    private val TAG = "ScanActivity"
+    private val TAG = this::class.java.simpleName
     private val REQUEST_ENABLE_BT = 1
     private var mScanning: Boolean = false
     private lateinit var handler: Handler
@@ -33,6 +34,7 @@ class ScanActivity : AppCompatActivity() {
     private lateinit var bondedDeviceList: ArrayList<BluetoothDevice>
     private lateinit var scanDeviceList: ArrayList<BluetoothDevice>
     private lateinit var scanDeviceListAdapter: DeviceListAdapter
+    private lateinit var btnScan: Button
     private fun PackageManager.missingSystemFeature(name: String): Boolean = !hasSystemFeature(name)
 
     // Get BluetoothAdapter
@@ -60,7 +62,22 @@ class ScanActivity : AppCompatActivity() {
 
         recyclerViewInit()
         bleInit()
+        buttonInit()
         scanLeDevice(true)
+    }
+
+    private fun addDevice(device: BluetoothDevice) {
+        var isListed = false;
+        for (listDevice in scanDeviceList) {
+            if (listDevice.address == device.address) {
+                isListed = true
+                break
+            }
+        }
+        if (!isListed) {
+            scanDeviceList.add(device)
+            scanDeviceListAdapter.notifyItemInserted(scanDeviceList.size - 1);
+        }
     }
 
     private val leScanCallback = object : ScanCallback() {
@@ -70,8 +87,7 @@ class ScanActivity : AppCompatActivity() {
 
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             Log.d(TAG, "LE scan result $callbackType $result")
-            scanDeviceList.add(result.device)
-            scanDeviceListAdapter.notifyItemInserted(scanDeviceList.size-1);
+            addDevice(result.device)
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -87,13 +103,16 @@ class ScanActivity : AppCompatActivity() {
                     handler.postDelayed({
                         mScanning = false
                         bluetoothLeScanner?.stopScan(leScanCallback)
+                        btnScan.text = getString(R.string.scan_button)
                     }, SCAN_PERIOD)
                     mScanning = true
                     bluetoothLeScanner?.startScan(leScanCallback)
+                    btnScan.text = getString(R.string.cancel_button)
                 }
                 else -> {
                     mScanning = false
                     bluetoothLeScanner?.stopScan(leScanCallback)
+                    btnScan.text = getString(R.string.scan_button)
                 }
             }
         } else {
@@ -121,6 +140,12 @@ class ScanActivity : AppCompatActivity() {
             scanDeviceListAdapter.setOnItemClickListener(object:DeviceListAdapter.OnItemClickListener{
                 override fun onItemClickListener(view: View, position: Int, device: BluetoothDevice) {
                     Log.d(TAG, "Clicked device: ${device.name}")
+                    scanLeDevice(false)
+
+                    val result = Intent()
+                    result.putExtra(BluetoothDevice.EXTRA_DEVICE, device.address)
+                    setResult(RESULT_OK, result)
+                    finish()
                 }
             })
             // set adapter
@@ -130,6 +155,17 @@ class ScanActivity : AppCompatActivity() {
 
     private fun bleInit() {
         checkPermission()
+    }
+
+    private fun buttonInit() {
+        btnScan = findViewById(R.id.buttonScan)
+        btnScan.setOnClickListener {
+            if (mScanning) {
+                scanLeDevice(false)
+            } else {
+                scanLeDevice(true)
+            }
+        }
     }
 
     private fun checkPermission() {
