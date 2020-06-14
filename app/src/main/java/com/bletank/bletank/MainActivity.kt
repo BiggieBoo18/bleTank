@@ -3,25 +3,36 @@ package com.bletank.bletank
 import android.Manifest
 import android.app.Activity
 import android.bluetooth.BluetoothDevice
-import android.content.ComponentName
-import android.content.Intent
-import android.content.ServiceConnection
+import android.content.*
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 
 
 class MainActivity : AppCompatActivity() {
     private val TAG = this::class.java.simpleName
     private val REQUEST_DEVICE = 1
     private val REQUEST_ENABLE_FINE_LOCATION = 1
+
+    private val serviceConnection = object: ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+            bluetoothService = (binder as BluetoothService.LocalBinder).getService()
+            bound = true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            bluetoothService = null
+            bound = false
+        }
+    }
 
     private lateinit var btnConnect:  Button
     private lateinit var btnEngine:   Button
@@ -31,7 +42,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRight:    Button
     private lateinit var btnBrake:    Button
 
+    private var bound = false
     private var isConnected = false
+    private var isEngineStarted = false
     private var bluetoothService: BluetoothService? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,7 +57,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkPermission()
+        serviceStart()
         buttonInit()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        serviceInit()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (bound) {
+            unbindService(serviceConnection)
+            bound = false
+        }
     }
 
     private fun checkPermission() {
@@ -76,14 +103,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val serviceConnection: ServiceConnection = object : ServiceConnection {
-        override fun onServiceConnected(className: ComponentName, rawBinder: IBinder) {
-            bluetoothService = (rawBinder as BluetoothService.LocalBinder).getService()
-            Log.d(TAG, "onServiceConnected service= ${bluetoothService}")
+    private fun serviceInit() {
+        Intent(this, BluetoothService::class.java).also {
+            bindService(it, serviceConnection, Context.BIND_AUTO_CREATE)
         }
+        LocalBroadcastManager.getInstance(this).registerReceiver(statusChangeReceiver, makeGattUpdateIntentFilter());
+    }
+    private fun makeGattUpdateIntentFilter(): IntentFilter {
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(BluetoothService.ACTION_GATT_CONNECTED)
+        intentFilter.addAction(BluetoothService.ACTION_GATT_DISCONNECTED)
+        intentFilter.addAction(BluetoothService.ACTION_GATT_SERVICES_DISCOVERED)
+        intentFilter.addAction(BluetoothService.ACTION_DATA_AVAILABLE)
+        intentFilter.addAction(BluetoothService.DEVICE_DOES_NOT_SUPPORT_UART)
+        return intentFilter
+    }
 
-        override fun onServiceDisconnected(classname: ComponentName) {
-            bluetoothService = null
+    private fun serviceStart() {
+        Intent(this, BluetoothService::class.java).also {
+            startService(it)
         }
     }
 
@@ -102,8 +140,62 @@ class MainActivity : AppCompatActivity() {
                 val intent = Intent(this, ScanActivity::class.java)
                 startActivityForResult(intent, REQUEST_DEVICE)
             } else {
-                btnConnect.text = getString(R.string.connect_button)
+                bluetoothService?.disconnect()
+                (findViewById<TextView>(R.id.connectedDeviceName)).text = ""
                 isConnected = false
+            }
+        }
+        btnEngine.setOnClickListener {
+            if (!isEngineStarted) {
+                bluetoothService?.writeRXCharacteristic("engine start".toByteArray())
+                isEngineStarted = true
+                btnEngine.text = getString(R.string.engine_stop)
+            } else {
+                bluetoothService?.writeRXCharacteristic("engine stop".toByteArray())
+                isEngineStarted = false
+                btnEngine.text = getString(R.string.engine_start)
+            }
+        }
+    }
+
+    private val statusChangeReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when(intent.action) {
+                BluetoothService.ACTION_GATT_CONNECTED -> {
+                    runOnUiThread {
+                        Log.d(TAG, "UART_CONNECT_MSG")
+                        btnConnect.text = getString(R.string.disconnect_button)
+                    }
+                }
+
+                BluetoothService.ACTION_GATT_DISCONNECTED -> {
+                    runOnUiThread {
+                        Log.d(TAG, "UART_DISCONNECT_MSG")
+                        btnConnect.text = getString(R.string.connect_button)
+                    }
+                }
+
+                BluetoothService.ACTION_GATT_SERVICES_DISCOVERED -> {
+                    bluetoothService?.enableTXNotification()
+                }
+
+                BluetoothService.ACTION_DATA_AVAILABLE -> {
+                    val txValue = intent.getByteArrayExtra(BluetoothService.EXTRA_DATA)
+                    runOnUiThread {
+                        try {
+                            val text = txValue.toString(charset("UTF-8"))
+                            Log.d(TAG, "Recieved data: ${text}")
+                        } catch (e: Exception) {
+                            Log.e(TAG, e.toString())
+                        }
+                    }
+                }
+
+                BluetoothService.DEVICE_DOES_NOT_SUPPORT_UART -> {
+                    Log.d(TAG, "Device doesn't support UART. Disconnecting")
+                    bluetoothService?.disconnect()
+                    (findViewById<TextView>(R.id.connectedDeviceName)).text = ""
+                }
             }
         }
     }
@@ -114,8 +206,10 @@ class MainActivity : AppCompatActivity() {
             REQUEST_DEVICE -> {
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     val address = data.getStringExtra(BluetoothDevice.EXTRA_DEVICE)
-                    bluetoothService?.connect(address)
-                    Log.d(TAG, address)
+                    if (bluetoothService?.connect(address)!!) {
+                        isConnected = true
+                        (findViewById<TextView>(R.id.connectedDeviceName)).text = address
+                    }
                 }
             }
         }
@@ -123,6 +217,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        bluetoothService?.disconnect()
         bluetoothService?.unbindService(serviceConnection)
         bluetoothService?.stopSelf()
         bluetoothService = null

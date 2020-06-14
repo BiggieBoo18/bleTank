@@ -2,6 +2,7 @@ package com.bletank.bletank
 
 import android.app.Service
 import android.bluetooth.*
+import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
@@ -10,17 +11,21 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import java.util.*
 
 
-abstract class BluetoothService: Service() {
+class BluetoothService: Service() {
+    companion object {
+        val ACTION_GATT_CONNECTED = "com.example.bluetooth.le.ACTION_GATT_CONNECTED"
+        val ACTION_GATT_DISCONNECTED = "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED"
+        val ACTION_GATT_SERVICES_DISCOVERED =
+            "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED"
+        val ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE"
+        val DEVICE_DOES_NOT_SUPPORT_UART = "com.example.bluetooth.le.DEVICE_DOES_NOT_SUPPORT_UART"
+        val EXTRA_DATA = "com.example.bluetooth.le.EXTRA_DATA"
+    }
+
     private val TAG = BluetoothService::class.java.simpleName
     private val STATE_DISCONNECTED = 0
     private val STATE_CONNECTING = 1
     private val STATE_CONNECTED = 2
-    private val ACTION_GATT_CONNECTED = "com.example.bluetooth.le.ACTION_GATT_CONNECTED"
-    private val ACTION_GATT_DISCONNECTED = "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED"
-    private val ACTION_GATT_SERVICES_DISCOVERED = "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED"
-    private val ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE"
-    private val EXTRA_DATA = "com.example.bluetooth.le.EXTRA_DATA"
-    private val DEVICE_DOES_NOT_SUPPORT_UART = "com.nordicsemi.nrfUART.DEVICE_DOES_NOT_SUPPORT_UART"
 
     private val UART_SERVICE_UUID: UUID = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
     private val RX_CHARACTERISTIC_UUID: UUID = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
@@ -34,7 +39,8 @@ abstract class BluetoothService: Service() {
     }
     // Get BluetoothAdapter
     private val bluetoothAdapter: BluetoothAdapter? by lazy(LazyThreadSafetyMode.NONE) {
-        bluetoothManager?.adapter
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothManager.adapter
     }
     private val BluetoothAdapter.isDisabled: Boolean
         get() = !isEnabled
