@@ -2,6 +2,15 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <CircularBuffer.h>
+
+#define CMD_ENGINE_START 0
+#define CMD_ENGINE_STOP  1
+#define CMD_BRAKING      2
+#define CMD_FORWARD      3
+#define CMD_BACKWARD     4
+#define CMD_TURN_LEFT    5
+#define CMD_TURN_RIGHT   6
 
 // BLE variables
 BLEServer *pServer = NULL;
@@ -9,6 +18,7 @@ BLECharacteristic * pTxCharacteristic;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 uint8_t txValue = 0;
+CircularBuffer<String, 512> buffer;
 
 // UART service UUID
 #define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -18,28 +28,21 @@ uint8_t txValue = 0;
 // Server callback
 class ServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
+      Serial.println("connected");
       deviceConnected = true;
     };
 
     void onDisconnect(BLEServer* pServer) {
+      Serial.println("disconnected");
       deviceConnected = false;
+      pServer->startAdvertising(); // restart advertising
     }
 };
 
 // Data recieved callback
 class DataRecievedCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-      std::string rxValue = pCharacteristic->getValue();
-
-      if (rxValue.length() > 0) {
-        Serial.println("*********");
-        Serial.print("Received Value: ");
-        for (int i = 0; i < rxValue.length(); i++)
-          Serial.print(rxValue[i]);
-
-        Serial.println();
-        Serial.println("*********");
-      }
+      buffer.push(pCharacteristic->getValue().c_str());
     }
 };
 
@@ -96,24 +99,40 @@ void setup(){
   pinMode(in1Pin, OUTPUT);
   pinMode(in2Pin, OUTPUT);
 }
+
+void parse_command() {
+  String command = buffer.pop();
+  Serial.println(command);
+  switch (command.toInt()) {
+    case CMD_ENGINE_START:
+      Serial.println("CMD_ENGINE_START");
+      break;
+    case CMD_ENGINE_STOP:
+      Serial.println("CMD_ENGINE_STOP");
+      break;
+    case CMD_BRAKING:
+      Serial.println("CMD_BRAKING");
+      break;
+    case CMD_FORWARD:
+      Serial.println("CMD_FORWARD");
+      break;
+    case CMD_BACKWARD:
+      Serial.println("CMD_BACKWARD");
+      break;
+    case CMD_TURN_LEFT:
+      Serial.println("CMD_TURN_LEFT");
+      break;
+    case CMD_TURN_RIGHT:
+      Serial.println("CMD_TURN_RIGHT");
+      break;
+  }
+}
  
 void loop(){
-  // disconnecting
-  if (!deviceConnected && oldDeviceConnected) {
-    delay(500); // give the bluetooth stack the chance to get things ready
-    pServer->startAdvertising(); // restart advertising
-    Serial.println("start advertising");
-    oldDeviceConnected = deviceConnected;
+  if (!buffer.isEmpty()) {
+    parse_command();
   }
-  // connecting
-  if (deviceConnected && !oldDeviceConnected) {
-    // do stuff here on connecting
-    pTxCharacteristic->setValue("Hello, controller!");
-    pTxCharacteristic->notify();
-    oldDeviceConnected = deviceConnected;
-    delay(10);
-  }
-  
+  delay(10);
 //  digitalWrite(in1Pin, LOW);
 //  digitalWrite(in2Pin, HIGH);
 //  // increase the LED brightness

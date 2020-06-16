@@ -147,14 +147,29 @@ class MainActivity : AppCompatActivity() {
         }
         btnEngine.setOnClickListener {
             if (!isEngineStarted) {
-                bluetoothService?.writeRXCharacteristic("engine start".toByteArray())
+                bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_engine_start).toByteArray())
                 isEngineStarted = true
                 btnEngine.text = getString(R.string.engine_stop)
             } else {
-                bluetoothService?.writeRXCharacteristic("engine stop".toByteArray())
+                bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_engine_stop).toByteArray())
                 isEngineStarted = false
                 btnEngine.text = getString(R.string.engine_start)
             }
+        }
+        btnBrake.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_braking).toByteArray())
+        }
+        btnForward.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_forward).toByteArray())
+        }
+        btnBackward.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_backward).toByteArray())
+        }
+        btnLeft.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_turn_left).toByteArray())
+        }
+        btnRight.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_turn_right).toByteArray())
         }
     }
 
