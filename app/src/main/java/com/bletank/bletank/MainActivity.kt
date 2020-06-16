@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -34,13 +35,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private lateinit var btnConnect:  Button
-    private lateinit var btnEngine:   Button
-    private lateinit var btnForward:  Button
-    private lateinit var btnBackward: Button
-    private lateinit var btnLeft:     Button
-    private lateinit var btnRight:    Button
-    private lateinit var btnBrake:    Button
+    private lateinit var btnConnect:   Button
+    private lateinit var btnEngine:    Button
+    private lateinit var btnForward:   Button
+    private lateinit var btnBackward:  Button
+    private lateinit var btnLeft:      Button
+    private lateinit var btnRight:     Button
+    private lateinit var btnBrake:     Button
+    private lateinit var seekbarSpeed: SeekBar
 
     private var bound = false
     private var isConnected = false
@@ -59,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         checkPermission()
         serviceStart()
         buttonInit()
+        seekbarInit()
     }
 
     override fun onStart() {
@@ -147,15 +150,60 @@ class MainActivity : AppCompatActivity() {
         }
         btnEngine.setOnClickListener {
             if (!isEngineStarted) {
-                bluetoothService?.writeRXCharacteristic("engine start".toByteArray())
+                bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_engine_start).toByteArray())
                 isEngineStarted = true
                 btnEngine.text = getString(R.string.engine_stop)
             } else {
-                bluetoothService?.writeRXCharacteristic("engine stop".toByteArray())
+                bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_engine_stop).toByteArray())
                 isEngineStarted = false
                 btnEngine.text = getString(R.string.engine_start)
             }
         }
+        btnBrake.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_braking).toByteArray())
+        }
+        btnForward.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_forward).toByteArray())
+        }
+        btnBackward.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_backward).toByteArray())
+        }
+        btnLeft.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_turn_left).toByteArray())
+        }
+        btnRight.setOnClickListener {
+            bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_turn_right).toByteArray())
+        }
+        LongClickRepeatAdapter.bless(btnBrake)
+        LongClickRepeatAdapter.bless(btnForward)
+        LongClickRepeatAdapter.bless(btnBackward)
+        LongClickRepeatAdapter.bless(btnLeft)
+        LongClickRepeatAdapter.bless(btnRight)
+    }
+
+    private fun seekbarInit() {
+        seekbarSpeed = findViewById(R.id.speedBar)
+        seekbarSpeed.progress = 0
+        seekbarSpeed.max = 255
+        seekbarSpeed.setOnSeekBarChangeListener(
+            object: SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean
+                ) {
+                    bluetoothService?.writeRXCharacteristic(progress.toString().toByteArray())
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                }
+
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                }
+            }
+        )
+
+
     }
 
     private val statusChangeReceiver: BroadcastReceiver = object : BroadcastReceiver() {

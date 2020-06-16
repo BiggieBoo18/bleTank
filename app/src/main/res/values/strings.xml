@@ -12,4 +12,13 @@
     <string name="turn_right">→</string>
     <string name="scan_button">Scan</string>
     <string name="cancel_button">Cancel</string>
+
+    // command
+    <string name="cmd_engine_start">256</string>
+    <string name="cmd_engine_stop">257</string>
+    <string name="cmd_braking">258</string>
+    <string name="cmd_forward">259</string>
+    <string name="cmd_backward">260</string>
+    <string name="cmd_turn_left">261</string>
+    <string name="cmd_turn_right">262</string>
 </resources>

@@ -2,13 +2,24 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <CircularBuffer.h>
+
+#define CMD_ENGINE_START 256
+#define CMD_ENGINE_STOP  257
+#define CMD_BRAKING      258
+#define CMD_FORWARD      259
+#define CMD_BACKWARD     260
+#define CMD_TURN_LEFT    261
+#define CMD_TURN_RIGHT   262
 
 // BLE variables
 BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
+bool isEngineStarted = false;
 uint8_t txValue = 0;
+CircularBuffer<String, 512> buffer;
 
 // UART service UUID
 #define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -18,40 +29,34 @@ uint8_t txValue = 0;
 // Server callback
 class ServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
+      Serial.println("connected");
       deviceConnected = true;
     };
 
     void onDisconnect(BLEServer* pServer) {
+      Serial.println("disconnected");
       deviceConnected = false;
+      pServer->startAdvertising(); // restart advertising
     }
 };
 
 // Data recieved callback
 class DataRecievedCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-      std::string rxValue = pCharacteristic->getValue();
-
-      if (rxValue.length() > 0) {
-        Serial.println("*********");
-        Serial.print("Received Value: ");
-        for (int i = 0; i < rxValue.length(); i++)
-          Serial.print(rxValue[i]);
-
-        Serial.println();
-        Serial.println("*********");
-      }
+      buffer.push(pCharacteristic->getValue().c_str());
     }
 };
 
 // pin
 const int vrefPin = 25;  // 25 corresponds to GPIO25
-const int in1Pin = 26;
-const int in2Pin = 27;
+const int in1_1Pin = 26;
+const int in1_2Pin = 27;
 
 // setting PWM properties
 const int freq = 30000;
 const int vrefChannel = 0;
 const int resolution = 8;
+int dutyCycle = 255;
  
 void setup(){
   Serial.begin(115200);
@@ -93,40 +98,81 @@ void setup(){
   
   // attach the channel to the GPIO to be controlled
   ledcAttachPin(vrefPin, vrefChannel);
-  pinMode(in1Pin, OUTPUT);
-  pinMode(in2Pin, OUTPUT);
+  pinMode(in1_1Pin, OUTPUT);
+  pinMode(in1_2Pin, OUTPUT);
+}
+
+void parse_command() {
+  String command = buffer.pop();
+  Serial.println(command);
+  switch (command.toInt()) {
+    case CMD_ENGINE_START:
+      isEngineStarted = true;
+      Serial.println("CMD_ENGINE_START");
+      break;
+    case CMD_ENGINE_STOP:
+      isEngineStarted = false;
+      Serial.println("CMD_ENGINE_STOP");
+      break;
+    case CMD_BRAKING:
+      Serial.println("CMD_BRAKING");
+      if (isEngineStarted) {
+        digitalWrite(in1_1Pin, HIGH);
+        digitalWrite(in1_2Pin, HIGH);
+//        digitalWrite(in2_1Pin, HIGH);
+//        digitalWrite(in2_2Pin, HIGH);
+      }
+      break;
+    case CMD_FORWARD:
+      Serial.println("CMD_FORWARD");
+      if (isEngineStarted) {
+        digitalWrite(in1_1Pin, HIGH);
+        digitalWrite(in1_2Pin, LOW);
+//        digitalWrite(in2_1Pin, HIGH);
+//        digitalWrite(in2_2Pin, LOW);
+      }
+      break;
+    case CMD_BACKWARD:
+      Serial.println("CMD_BACKWARD");
+      if (isEngineStarted) {
+        digitalWrite(in1_1Pin, LOW);
+        digitalWrite(in1_2Pin, HIGH);
+//        digitalWrite(in2_1Pin, LOW);
+//        digitalWrite(in2_2Pin, HIGH);
+      }
+      break;
+    case CMD_TURN_LEFT:
+      Serial.println("CMD_TURN_LEFT");
+      if (isEngineStarted) {
+        digitalWrite(in1_1Pin, HIGH);
+        digitalWrite(in1_2Pin, LOW);
+//        digitalWrite(in2_1Pin, LOW);
+//        digitalWrite(in2_2Pin, HIGH);
+      }
+      break;
+    case CMD_TURN_RIGHT:
+      Serial.println("CMD_TURN_RIGHT");
+      if (isEngineStarted) {
+        digitalWrite(in1_1Pin, LOW);
+        digitalWrite(in1_2Pin, HIGH);
+//        digitalWrite(in2_1Pin, HIGH);
+//        digitalWrite(in2_2Pin, LOW);
+      }
+      break;
+    default:
+      Serial.println("CMD_SPEED");
+      dutyCycle = command.toInt(); 
+  }
+  delay(100);
+  // stop after delay
+  digitalWrite(in1_1Pin, LOW);
+  digitalWrite(in1_2Pin, LOW);
 }
  
 void loop(){
-  // disconnecting
-  if (!deviceConnected && oldDeviceConnected) {
-    delay(500); // give the bluetooth stack the chance to get things ready
-    pServer->startAdvertising(); // restart advertising
-    Serial.println("start advertising");
-    oldDeviceConnected = deviceConnected;
+  if (!buffer.isEmpty()) {
+    parse_command();
   }
-  // connecting
-  if (deviceConnected && !oldDeviceConnected) {
-    // do stuff here on connecting
-    pTxCharacteristic->setValue("Hello, controller!");
-    pTxCharacteristic->notify();
-    oldDeviceConnected = deviceConnected;
-    delay(10);
-  }
-  
-//  digitalWrite(in1Pin, LOW);
-//  digitalWrite(in2Pin, HIGH);
-//  // increase the LED brightness
-//  for(int dutyCycle = 0; dutyCycle <= 255; dutyCycle++){   
-//    // changing the LED brightness with PWM
-//    ledcWrite(vrefChannel, dutyCycle);
-//    delay(15);
-//  }
-//
-//  // decrease the LED brightness
-//  for(int dutyCycle = 255; dutyCycle >= 0; dutyCycle--){
-//    // changing the LED brightness with PWM
-//    ledcWrite(vrefChannel, dutyCycle);   
-//    delay(15);
-//  }
+  ledcWrite(vrefChannel, dutyCycle);
+  delay(15);
 }
