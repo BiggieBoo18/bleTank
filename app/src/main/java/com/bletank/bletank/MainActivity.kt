@@ -13,9 +13,11 @@ import android.widget.Button
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.google.android.material.snackbar.Snackbar
 
 
 class MainActivity : AppCompatActivity() {
@@ -35,6 +37,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private lateinit var rootLayout:   ConstraintLayout
     private lateinit var btnConnect:   Button
     private lateinit var btnEngine:    Button
     private lateinit var btnForward:   Button
@@ -60,8 +63,18 @@ class MainActivity : AppCompatActivity() {
 
         checkPermission()
         serviceStart()
+        rootLayout = findViewById(R.id.rootLayout)
         buttonInit()
         seekbarInit()
+        buttonsEnableDisable(listOf(
+            btnEngine,
+            btnForward,
+            btnBackward,
+            btnLeft,
+            btnRight,
+            btnBrake,
+            seekbarSpeed
+        ), false)
     }
 
     override fun onStart() {
@@ -146,6 +159,15 @@ class MainActivity : AppCompatActivity() {
                 bluetoothService?.disconnect()
                 (findViewById<TextView>(R.id.connectedDeviceName)).text = ""
                 isConnected = false
+                buttonsEnableDisable(listOf(
+                    btnEngine,
+                    btnForward,
+                    btnBackward,
+                    btnLeft,
+                    btnRight,
+                    btnBrake,
+                    seekbarSpeed
+                ), false)
             }
         }
         btnEngine.setOnClickListener {
@@ -153,10 +175,26 @@ class MainActivity : AppCompatActivity() {
                 bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_engine_start).toByteArray())
                 isEngineStarted = true
                 btnEngine.text = getString(R.string.engine_stop)
+                buttonsEnableDisable(listOf(
+                    btnForward,
+                    btnBackward,
+                    btnLeft,
+                    btnRight,
+                    btnBrake,
+                    seekbarSpeed
+                ), true)
             } else {
                 bluetoothService?.writeRXCharacteristic(getString(R.string.cmd_engine_stop).toByteArray())
                 isEngineStarted = false
                 btnEngine.text = getString(R.string.engine_start)
+                buttonsEnableDisable(listOf(
+                    btnForward,
+                    btnBackward,
+                    btnLeft,
+                    btnRight,
+                    btnBrake,
+                    seekbarSpeed
+                ), false)
             }
         }
         btnBrake.setOnClickListener {
@@ -181,9 +219,15 @@ class MainActivity : AppCompatActivity() {
         LongClickRepeatAdapter.bless(btnRight)
     }
 
+    private fun <T: View> buttonsEnableDisable(buttons: List<T>, enable_disable: Boolean) {
+        for (button in buttons) {
+            button.isEnabled = enable_disable
+        }
+    }
+
     private fun seekbarInit() {
         seekbarSpeed = findViewById(R.id.speedBar)
-        seekbarSpeed.progress = 0
+        seekbarSpeed.progress = 255
         seekbarSpeed.max = 255
         seekbarSpeed.setOnSeekBarChangeListener(
             object: SeekBar.OnSeekBarChangeListener {
@@ -212,7 +256,14 @@ class MainActivity : AppCompatActivity() {
                 BluetoothService.ACTION_GATT_CONNECTED -> {
                     runOnUiThread {
                         Log.d(TAG, "UART_CONNECT_MSG")
+                        buttonsEnableDisable(listOf(
+                            btnEngine
+                        ), true)
                         btnConnect.text = getString(R.string.disconnect_button)
+                        isConnected = true
+                        (findViewById<TextView>(R.id.connectedDeviceName)).text =
+                            bluetoothService?.getDeviceName() ?: "null"
+                        showSnackbar(rootLayout, "Connection succeeded!")
                     }
                 }
 
@@ -220,6 +271,9 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread {
                         Log.d(TAG, "UART_DISCONNECT_MSG")
                         btnConnect.text = getString(R.string.connect_button)
+                        isConnected = false
+                        (findViewById<TextView>(R.id.connectedDeviceName)).text = ""
+                        showSnackbar(rootLayout, "Disconnected...")
                     }
                 }
 
@@ -243,6 +297,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d(TAG, "Device doesn't support UART. Disconnecting")
                     bluetoothService?.disconnect()
                     (findViewById<TextView>(R.id.connectedDeviceName)).text = ""
+                    btnConnect.text = getString(R.string.connect_button)
                 }
             }
         }
@@ -255,8 +310,6 @@ class MainActivity : AppCompatActivity() {
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     val address = data.getStringExtra(BluetoothDevice.EXTRA_DEVICE)
                     if (bluetoothService?.connect(address)!!) {
-                        isConnected = true
-                        (findViewById<TextView>(R.id.connectedDeviceName)).text = address
                     }
                 }
             }
@@ -269,5 +322,10 @@ class MainActivity : AppCompatActivity() {
         bluetoothService?.unbindService(serviceConnection)
         bluetoothService?.stopSelf()
         bluetoothService = null
+    }
+
+    fun showSnackbar(view: View, message: String) {
+        val snackbar = Snackbar.make(view, message, Snackbar.LENGTH_SHORT)
+        snackbar.show()
     }
 }

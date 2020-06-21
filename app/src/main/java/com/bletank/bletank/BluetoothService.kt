@@ -47,6 +47,7 @@ class BluetoothService: Service() {
 
     private var connectionState = STATE_DISCONNECTED
     private var bluetoothGatt: BluetoothGatt? = null
+    private var bluetoothDevice: BluetoothDevice? = null
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(
@@ -132,8 +133,8 @@ class BluetoothService: Service() {
         if (bluetoothAdapter == null || address.isEmpty()) {
             return false
         }
-        val device = bluetoothAdapter!!.getRemoteDevice(address) ?: return false
-        bluetoothGatt = device.connectGatt(this, false, gattCallback)
+        bluetoothDevice = bluetoothAdapter!!.getRemoteDevice(address) ?: return false
+        bluetoothGatt = bluetoothDevice!!.connectGatt(this, false, gattCallback)
         Log.d(TAG, "Trying to create a new connection.")
         connectionState = STATE_CONNECTING
         return true
@@ -200,6 +201,10 @@ class BluetoothService: Service() {
         Log.d(TAG, "write TXchar - status=$status")
     }
 
+    fun getDeviceName(): String? {
+        return bluetoothDevice?.name
+    }
+
     inner class LocalBinder: Binder() {
         fun getService(): BluetoothService = this@BluetoothService
     }
@@ -209,5 +214,4 @@ class BluetoothService: Service() {
     override fun onUnbind(intent: Intent?): Boolean {
         return super.onUnbind(intent)
     }
-
 }
