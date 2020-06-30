@@ -48,9 +48,12 @@ class DataRecievedCallbacks: public BLECharacteristicCallbacks {
 };
 
 // pin
-const int vrefPin = 25;  // 25 corresponds to GPIO25
+const int vref1Pin = 25;
 const int in1_1Pin = 26;
 const int in1_2Pin = 27;
+const int vref2Pin = 34;
+const int in2_1Pin = 35;
+const int in2_2Pin = 32;
 
 // setting PWM properties
 const int freq = 30000;
@@ -97,9 +100,12 @@ void setup(){
   ledcSetup(vrefChannel, freq, resolution);
   
   // attach the channel to the GPIO to be controlled
-  ledcAttachPin(vrefPin, vrefChannel);
+  ledcAttachPin(vref1Pin, vrefChannel);
+  ledcAttachPin(vref2Pin, vrefChannel);
   pinMode(in1_1Pin, OUTPUT);
   pinMode(in1_2Pin, OUTPUT);
+  pinMode(in2_1Pin, OUTPUT);
+  pinMode(in2_2Pin, OUTPUT);
 }
 
 void parse_command() {
@@ -119,8 +125,8 @@ void parse_command() {
       if (isEngineStarted) {
         digitalWrite(in1_1Pin, HIGH);
         digitalWrite(in1_2Pin, HIGH);
-//        digitalWrite(in2_1Pin, HIGH);
-//        digitalWrite(in2_2Pin, HIGH);
+        digitalWrite(in2_1Pin, HIGH);
+        digitalWrite(in2_2Pin, HIGH);
       }
       break;
     case CMD_FORWARD:
@@ -128,8 +134,8 @@ void parse_command() {
       if (isEngineStarted) {
         digitalWrite(in1_1Pin, HIGH);
         digitalWrite(in1_2Pin, LOW);
-//        digitalWrite(in2_1Pin, HIGH);
-//        digitalWrite(in2_2Pin, LOW);
+        digitalWrite(in2_1Pin, HIGH);
+        digitalWrite(in2_2Pin, LOW);
       }
       break;
     case CMD_BACKWARD:
@@ -137,8 +143,8 @@ void parse_command() {
       if (isEngineStarted) {
         digitalWrite(in1_1Pin, LOW);
         digitalWrite(in1_2Pin, HIGH);
-//        digitalWrite(in2_1Pin, LOW);
-//        digitalWrite(in2_2Pin, HIGH);
+        digitalWrite(in2_1Pin, LOW);
+        digitalWrite(in2_2Pin, HIGH);
       }
       break;
     case CMD_TURN_LEFT:
@@ -146,8 +152,8 @@ void parse_command() {
       if (isEngineStarted) {
         digitalWrite(in1_1Pin, HIGH);
         digitalWrite(in1_2Pin, LOW);
-//        digitalWrite(in2_1Pin, LOW);
-//        digitalWrite(in2_2Pin, HIGH);
+        digitalWrite(in2_1Pin, LOW);
+        digitalWrite(in2_2Pin, HIGH);
       }
       break;
     case CMD_TURN_RIGHT:
@@ -155,8 +161,8 @@ void parse_command() {
       if (isEngineStarted) {
         digitalWrite(in1_1Pin, LOW);
         digitalWrite(in1_2Pin, HIGH);
-//        digitalWrite(in2_1Pin, HIGH);
-//        digitalWrite(in2_2Pin, LOW);
+        digitalWrite(in2_1Pin, HIGH);
+        digitalWrite(in2_2Pin, LOW);
       }
       break;
     default:
@@ -167,6 +173,8 @@ void parse_command() {
   // stop after delay
   digitalWrite(in1_1Pin, LOW);
   digitalWrite(in1_2Pin, LOW);
+  digitalWrite(in2_1Pin, LOW);
+  digitalWrite(in2_2Pin, LOW);
 }
  
 void loop(){
