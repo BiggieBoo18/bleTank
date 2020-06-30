@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var rootLayout:   ConstraintLayout
     private lateinit var btnConnect:   Button
+    private lateinit var btnForceDisconnect: Button
     private lateinit var btnEngine:    Button
     private lateinit var btnForward:   Button
     private lateinit var btnBackward:  Button
@@ -143,13 +144,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun buttonInit() {
         // get buttons
-        btnConnect   = findViewById<Button>(R.id.buttonConnect) // button connect
-        btnEngine    = findViewById<Button>(R.id.buttonEngine)  // button engine
-        btnForward   = findViewById<Button>(R.id.buttonForward)  // button forward
-        btnBackward  = findViewById<Button>(R.id.buttonBackward)  // button backward
-        btnLeft      = findViewById<Button>(R.id.buttonLeft)  // button left
-        btnRight     = findViewById<Button>(R.id.buttonRight)  // button right
-        btnBrake     = findViewById<Button>(R.id.buttonBrake)  // button brake
+        btnConnect         = findViewById<Button>(R.id.buttonConnect) // button connect
+        btnForceDisconnect = findViewById<Button>(R.id.buttonForceDisconnect) // button force disconnect
+        btnEngine          = findViewById<Button>(R.id.buttonEngine)  // button engine
+        btnForward         = findViewById<Button>(R.id.buttonForward)  // button forward
+        btnBackward        = findViewById<Button>(R.id.buttonBackward)  // button backward
+        btnLeft            = findViewById<Button>(R.id.buttonLeft)  // button left
+        btnRight           = findViewById<Button>(R.id.buttonRight)  // button right
+        btnBrake           = findViewById<Button>(R.id.buttonBrake)  // button brake
         // set listeners
         btnConnect.setOnClickListener {
             if (!isConnected) {
@@ -169,6 +171,20 @@ class MainActivity : AppCompatActivity() {
                     seekbarSpeed
                 ), false)
             }
+        }
+        btnForceDisconnect.setOnClickListener {
+            bluetoothService?.disconnect()
+            (findViewById<TextView>(R.id.connectedDeviceName)).text = ""
+            isConnected = false
+            buttonsEnableDisable(listOf(
+                btnEngine,
+                btnForward,
+                btnBackward,
+                btnLeft,
+                btnRight,
+                btnBrake,
+                seekbarSpeed
+            ), false)
         }
         btnEngine.setOnClickListener {
             if (!isEngineStarted) {
