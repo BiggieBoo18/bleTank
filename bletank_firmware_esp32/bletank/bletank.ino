@@ -169,7 +169,7 @@ void parse_command() {
       Serial.println("CMD_SPEED");
       dutyCycle = command.toInt(); 
   }
-  delay(175);
+  delay(100);
   // stop after delay
   digitalWrite(in1_1Pin, LOW);
   digitalWrite(in1_2Pin, LOW);
